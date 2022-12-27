@@ -1,0 +1,47 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+#instruction of how to run in command prompt
+#move directory to top level = cd\
+#change directory to where python is = cd Program Files\Python38
+#run python script = python "C:\Users\U380422\Documents\Long Term Manpower Planning\ConvertAllExcelToCsv3.py"
+
+import pandas as pd
+import os
+from glob import glob
+
+#path to folder of excel files
+read_path = "C:\\Users\\U380422\\Documents\\Long Term Manpower Planning\\Case 3\*.xlsx"
+
+#function to correctly format date column
+def convert_header(s):
+    s=s.split('-')
+    yr=int(s[0])
+    m=int(s[1])
+    months=['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    m=months[m-1]
+    yr=yr-2000
+    return str(yr)+'-'+m
+
+#function to read through excel folder and make csv in same folder
+for excel_file in glob(read_path):
+    print(excel_file)
+    df = pd.read_excel(excel_file)
+    col = df.columns.tolist()
+    strcol = [x for x in col if isinstance(x, str)]
+    lowstr = [x.lower() for x in strcol]
+    if (any("deps" in s for s in lowstr)) or (any("equip" in s for s in lowstr)) or (not any("fleet" in s for s in lowstr)) : #interim station stats file (deps) or subfleet reference (equip) has fleet but doesn't need special date formatting, anything without fleet has no special formattting
+        csv_file = os.path.splitext(excel_file)[0] + '.csv'
+        df.to_csv(csv_file, index=None, header=True)
+    else : #all remaining files should have fleet/fleet seat and then YY-Mon as columns
+        if 'category' in lowstr : #prior RL file has fleet wtih YY-Mon format but an extra column in front
+            df.rename(columns={ df.columns[1]: "fleet_seat" }, inplace = True) #force capitalization to be the same on all
+            df = df.set_index(['Category','fleet_seat'])
+        else:
+            df.rename(columns={ df.columns[0]: "fleet_seat" }, inplace = True) #force capitalization to be the same on all
+            df = df.set_index(df.columns[0])
+        init_columns=df.columns
+        for i in init_columns:
+            df=df.rename(columns={i:convert_header(str(i))})
+        csv_file = os.path.splitext(excel_file)[0] + '.csv'
+        df.to_csv(csv_file, index=True, header=True)
